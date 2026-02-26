@@ -1,6 +1,7 @@
 import type { Request, Response } from "express";
 import { createRequestRecord } from "../repositories/request.repository";
 import { createRequestSchema } from "../schemas/create-request.schema";
+import { normalizeLocationText } from "../services/location-normalizer.service";
 import { processCitizenRequest } from "../services/triage.service";
 
 export async function createRequestController(req: Request, res: Response) {
@@ -8,33 +9,44 @@ export async function createRequestController(req: Request, res: Response) {
 
   if (!parsed.success) {
     return res.status(400).json({
-      message: "Dados invalidos",
+      message: "Dados inválidos",
       errors: parsed.error.flatten(),
     });
   }
 
   try {
-    const triage = await processCitizenRequest(parsed.data);
+    const normalizedLocationText = await normalizeLocationText({
+      locationText: parsed.data.locationText,
+      latitude: parsed.data.latitude,
+      longitude: parsed.data.longitude,
+    });
+
+    const normalizedInput = {
+      ...parsed.data,
+      locationText: normalizedLocationText,
+    };
+
+    const triage = await processCitizenRequest(normalizedInput);
 
     const saved = await createRequestRecord({
-      ...parsed.data,
+      ...normalizedInput,
       ...triage,
     });
 
     return res.status(201).json(saved);
   } catch (error) {
-    console.error("Erro ao salvar solicitacao:", error);
+    console.error("Erro ao salvar solicitação:", error);
     if (error instanceof Error && error.message.toLowerCase().includes("gemini")) {
       const statusCode = error.message.includes("429") ? 503 : 502;
       return res.status(statusCode).json({
-        message: "Falha ao processar classificacao com Gemini",
+        message: "Falha ao processar classificação com Gemini",
         provider: "gemini",
         detail: error.message,
       });
     }
 
     return res.status(500).json({
-      message: "Erro interno ao salvar solicitacao",
+      message: "Erro interno ao salvar solicitação",
     });
   }
 }

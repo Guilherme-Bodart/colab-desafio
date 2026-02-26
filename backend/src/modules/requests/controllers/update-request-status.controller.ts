@@ -7,7 +7,7 @@ export async function updateRequestStatusController(req: Request, res: Response)
   const idParsed = requestIdSchema.safeParse(req.params);
   if (!idParsed.success) {
     return res.status(400).json({
-      message: "ID invalido",
+      message: "ID inválido",
       errors: idParsed.error.flatten(),
     });
   }
@@ -15,7 +15,7 @@ export async function updateRequestStatusController(req: Request, res: Response)
   const bodyParsed = updateRequestStatusSchema.safeParse(req.body);
   if (!bodyParsed.success) {
     return res.status(400).json({
-      message: "Status invalido",
+      message: "Status inválido",
       errors: bodyParsed.error.flatten(),
     });
   }
@@ -23,7 +23,7 @@ export async function updateRequestStatusController(req: Request, res: Response)
   try {
     const existing = await findRequestById(idParsed.data.id);
     if (!existing) {
-      return res.status(404).json({ message: "Solicitacao nao encontrada" });
+      return res.status(404).json({ message: "Solicitação não encontrada" });
     }
 
     const updated = await updateRequestStatus(idParsed.data.id, bodyParsed.data.status);

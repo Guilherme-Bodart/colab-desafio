@@ -178,7 +178,7 @@ export function LocationField({
     <div className="location-group">
       <div className="location-autocomplete">
         <label>
-          Localizacao
+          Localização
           <input
             required
             value={value}
@@ -221,7 +221,7 @@ export function LocationField({
         </Map>
       </div>
       <p className="map-help">
-        Selecione um endereco e ajuste o marcador para o ponto exato.
+        Selecione um endereço e ajuste o marcador para o ponto exato.
       </p>
     </div>
   );

@@ -7,7 +7,7 @@ export async function getRequestByIdController(req: Request, res: Response) {
 
   if (!parsed.success) {
     return res.status(400).json({
-      message: "ID invalido",
+      message: "ID inválido",
       errors: parsed.error.flatten(),
     });
   }
@@ -17,15 +17,15 @@ export async function getRequestByIdController(req: Request, res: Response) {
 
     if (!requestItem) {
       return res.status(404).json({
-        message: "Solicitacao nao encontrada",
+        message: "Solicitação não encontrada",
       });
     }
 
     return res.status(200).json(requestItem);
   } catch (error) {
-    console.error("Erro ao buscar solicitacao:", error);
+    console.error("Erro ao buscar solicitação:", error);
     return res.status(500).json({
-      message: "Erro interno ao buscar solicitacao",
+      message: "Erro interno ao buscar solicitação",
     });
   }
 }

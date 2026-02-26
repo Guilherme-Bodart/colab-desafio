@@ -7,7 +7,7 @@ export async function listRequestsController(req: Request, res: Response) {
 
   if (!parsed.success) {
     return res.status(400).json({
-      message: "Filtros invalidos",
+      message: "Filtros inválidos",
       errors: parsed.error.flatten(),
     });
   }
@@ -16,9 +16,9 @@ export async function listRequestsController(req: Request, res: Response) {
     const data = await listRequests(parsed.data);
     return res.status(200).json(data);
   } catch (error) {
-    console.error("Erro ao listar solicitacoes:", error);
+    console.error("Erro ao listar solicitações:", error);
     return res.status(500).json({
-      message: "Erro interno ao listar solicitacoes",
+      message: "Erro interno ao listar solicitações",
     });
   }
 }

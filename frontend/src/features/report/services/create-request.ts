@@ -1,9 +1,13 @@
 import { env } from "@/src/lib/env";
-import type { ApiResponse, RequestPayload } from "@/src/types/request";
+import type {
+  ApiResponse,
+  RejectedRequestResponse,
+  RequestPayload,
+} from "@/src/types/request";
 
 export async function createRequest(
   payload: RequestPayload
-): Promise<ApiResponse> {
+): Promise<ApiResponse | RejectedRequestResponse> {
   const response = await fetch(`${env.apiBaseUrl}/requests`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -16,9 +20,11 @@ export async function createRequest(
     }),
   });
 
+  const data = await response.json();
+
   if (!response.ok) {
-    throw new Error("Nao foi possivel enviar a solicitacao.");
+    throw new Error(data?.message ?? "Não foi possível enviar a solicitação.");
   }
 
-  return (await response.json()) as ApiResponse;
+  return data as ApiResponse | RejectedRequestResponse;
 }

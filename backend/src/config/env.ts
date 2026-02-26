@@ -11,4 +11,5 @@ export const env = {
   databaseUrl: getRequiredEnv("DATABASE_URL"),
   geminiApiKey: getRequiredEnv("GEMINI_API_KEY"),
   geminiModel: process.env.GEMINI_MODEL ?? "gemini-2.0-flash",
+  googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
 };
