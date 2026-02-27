@@ -21,6 +21,7 @@ export function ReportForm() {
   const [form, setForm] = useState<RequestPayload>(initialForm);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<ApiResponse | null>(null);
+  const [locationResetKey, setLocationResetKey] = useState(0);
   const [toasts, setToasts] = useState<
     Array<{
       id: number;
@@ -54,6 +55,14 @@ export function ReportForm() {
     }));
   }
 
+  function resetLocationPoint() {
+    setForm((prev) => ({
+      ...prev,
+      latitude: null,
+      longitude: null,
+    }));
+  }
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
@@ -80,6 +89,7 @@ export function ReportForm() {
 
       setResult(data as ApiResponse);
       setForm(initialForm);
+      setLocationResetKey((prev) => prev + 1);
       pushToast(
         "success",
         "Solicitação enviada",
@@ -138,9 +148,11 @@ export function ReportForm() {
         </label>
 
         <LocationField
+          key={locationResetKey}
           value={form.locationText}
           onAddressChange={updateLocationText}
           onPointChange={updateLocationPoint}
+          onPointReset={resetLocationPoint}
         />
 
         {form.latitude !== null && form.longitude !== null ? (

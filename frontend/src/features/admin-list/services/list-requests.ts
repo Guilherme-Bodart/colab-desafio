@@ -1,5 +1,5 @@
 import { env } from "@/src/lib/env";
-import type { ListRequestsResponse } from "@/src/types/request";
+import type { ListRequestsResponse, RequestStatus } from "@/src/types/request";
 
 type ListRequestsParams = {
   page: number;
@@ -7,7 +7,7 @@ type ListRequestsParams = {
   search?: string;
   category?: string;
   priority?: string;
-  status?: string;
+  status?: RequestStatus;
 };
 
 export async function listRequests(

@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Map,
   Marker,
   type MapMouseEvent,
+  useMap,
   useMapsLibrary,
 } from "@vis.gl/react-google-maps";
 
@@ -14,12 +15,14 @@ type LocationFieldProps = {
   value: string;
   onAddressChange: (address: string) => void;
   onPointChange: (point: google.maps.LatLngLiteral) => void;
+  onPointReset: () => void;
 };
 
 export function LocationField({
   value,
   onAddressChange,
   onPointChange,
+  onPointReset,
 }: LocationFieldProps) {
   const placesLibrary = useMapsLibrary("places");
   const geocoderRef = useRef<google.maps.Geocoder | null>(null);
@@ -41,6 +44,28 @@ export function LocationField({
     [position, userCenter]
   );
 
+  function geocodeAddress(query: string) {
+    if (!query || !window.google?.maps) return;
+
+    if (!geocoderRef.current) {
+      geocoderRef.current = new window.google.maps.Geocoder();
+    }
+
+    geocoderRef.current.geocode({ address: query }, (results, status) => {
+      if (status !== "OK" || !results?.[0]) return;
+
+      const location = results[0].geometry?.location;
+      if (!location) return;
+
+      const nextPoint = { lat: location.lat(), lng: location.lng() };
+      setPosition(nextPoint);
+      onPointChange(nextPoint);
+      skipNextSearchRef.current = true;
+      onAddressChange(results[0].formatted_address ?? query);
+      setSuggestions([]);
+    });
+  }
+
   useEffect(() => {
     if (!navigator.geolocation) return;
 
@@ -52,7 +77,7 @@ export function LocationField({
         });
       },
       () => {
-        // Se o usuario negar permissao, mantemos o centro padrao.
+        // Se o usuário negar permissão, mantemos o centro padrão.
       }
     );
   }, []);
@@ -170,7 +195,9 @@ export function LocationField({
   }
 
   function handleInputChange(nextValue: string) {
+    setPosition(null);
     setSuggestions([]);
+    onPointReset();
     onAddressChange(nextValue);
   }
 
@@ -183,7 +210,13 @@ export function LocationField({
             required
             value={value}
             onChange={(e) => handleInputChange(e.target.value)}
-            placeholder="Busque e selecione um endereco"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                geocodeAddress(value.trim());
+              }
+            }}
+            placeholder="Busque e selecione um endereço"
           />
         </label>
         {suggestions.length > 0 ? (
@@ -211,6 +244,7 @@ export function LocationField({
           disableDefaultUI={false}
           style={{ width: "100%", height: "100%" }}
         >
+          <MapAutoRecenter position={position} />
           {position ? (
             <Marker
               position={position}
@@ -225,4 +259,20 @@ export function LocationField({
       </p>
     </div>
   );
+}
+function MapAutoRecenter({
+  position,
+}: {
+  position: google.maps.LatLngLiteral | null;
+}) {
+  const map = useMap();
+  const lat = position?.lat;
+  const lng = position?.lng;
+
+  useEffect(() => {
+    if (!map || lat === undefined || lng === undefined) return;
+    map.panTo({ lat, lng });
+  }, [map, lat, lng]);
+
+  return null;
 }

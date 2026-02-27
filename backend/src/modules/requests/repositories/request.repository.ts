@@ -112,9 +112,7 @@ export async function listRequests(
   if (filters.search) {
     values.push(`%${filters.search}%`);
     const param = `$${values.length}`;
-    conditions.push(
-      `(title ILIKE ${param} OR description ILIKE ${param} OR location_text ILIKE ${param})`
-    );
+    conditions.push(`location_text ILIKE ${param}`);
   }
 
   if (filters.dateFrom) {
