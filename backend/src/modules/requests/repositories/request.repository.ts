@@ -71,7 +71,7 @@ export async function findRequestById(
 ): Promise<ProcessedRequest | null> {
   const result = await db.query(
     `
-      SELECT id, title, description, location_text, latitude, longitude,
+      SELECT requests.id, title, description, location_text, latitude, longitude,
              c.name AS category_name, status, priority, technical_summary,
              requests.created_at
       FROM requests

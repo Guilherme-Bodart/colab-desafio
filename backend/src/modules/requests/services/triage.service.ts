@@ -47,7 +47,7 @@ INSTRUÇÕES DETALHADAS PARA CLASSIFICAÇÃO:
    - "Drenagem e Saneamento": vazamentos, bueiros entupidos, alagamentos, esgoto. (Nota: Se água parada atrai mosquito, a raiz é Drenagem).
    - "Poluição Visual e Ambiental": pichações, cartazes irregulares.
    - "Controle de Zoonoses e Pragas": infestações diretas de vetores sem causa óbvia de infraestrutura.
-   - "Outros": apenas se não se encaixar nas anteriores.
+   - "Outros": apenas se não se encaixar nas anteriores ou pedidos para criar/instalar coisas NOVAS (ex: novo bicicletário, asfaltar rua de terra), intervenções artísticas, sugestões de projetos ou qualquer relato que NÃO seja conserto/limpeza de algo já existente.
 
 2. **PRIORIDADE** (Calibre rigorosamente pelo risco):
    - "Alta": Risco IMEDIATO à vida, segurança ou trânsito (ex: semáforo apagado, árvore caída na via, buraco profundo, esgoto jorrando, bueiro sem tampa).
@@ -63,6 +63,7 @@ REGRAS DE OURO:
 - Galho ou árvore bloqueando faixa de rolamento = Prioridade ALTA.
 - Lâmpada queimada isolada = Prioridade MÉDIA.
 - Falha completa de semáforo = Prioridade ALTA.
+- Pedidos de NOVAS instalações, obras do zero ou sugestões (ex: "seria bom ter um bicicletário", "pintar um mural") DEVEM ir obrigatoriamente para a categoria "Outros" com prioridade "Baixa".
 
 Retorne APENAS um objeto JSON válido.
 EXEMPLO DE SAÍDA:
