@@ -1,5 +1,6 @@
-import type { Request, Response } from "express";
+﻿import type { Request, Response } from "express";
 import { createRequestRecord } from "../repositories/request.repository";
+import { AIProviderError } from "../errors/ai-provider.error";
 import { createRequestSchema } from "../schemas/create-request.schema";
 import { normalizeLocationText } from "../services/location-normalizer.service";
 import { processCitizenRequest } from "../services/triage.service";
@@ -36,12 +37,12 @@ export async function createRequestController(req: Request, res: Response) {
     return res.status(201).json(saved);
   } catch (error) {
     console.error("Erro ao salvar solicitação:", error);
-    if (error instanceof Error && error.message.toLowerCase().includes("gemini")) {
-      const statusCode = error.message.includes("429") ? 503 : 502;
-      return res.status(statusCode).json({
-        message: "Falha ao processar classificação com Gemini",
-        provider: "gemini",
-        detail: error.message,
+
+    if (error instanceof AIProviderError) {
+      return res.status(error.statusCode).json({
+        message: error.message,
+        provider: error.provider,
+        detail: error.detail,
       });
     }
 

@@ -1,65 +1,201 @@
-# Desafio Técnico: Colab - Zeladoria Inteligente com IA
+﻿# Colab Desafio - Zeladoria Inteligente com IA
 
-## 1. Contexto do Cenário
+PoC fullstack para triagem automática de solicitações urbanas.
+O sistema recebe relatos de cidadãos, classifica com IA, persiste no banco e disponibiliza visão administrativa em lista e mapa.
 
-O Colab conecta cidadãos ao governo para resolver problemas urbanos. Um dos maiores gargalos das prefeituras é a triagem manual de milhares de solicitações diárias. Uma descrição vaga como "Tem um buraco aqui na frente" precisa ser classificada corretamente (ex: Manutenção de Vias) e priorizada antes de chegar à equipe de obras.
+## Stack
 
-Sua missão: Desenvolver uma prova de conceito (PoC) de uma aplicação que utilize Inteligência Artificial Generativa para automatizar a triagem e enriquecer os dados reportados pelo cidadão.
+- Frontend: Next.js + React + TypeScript
+- Backend: Node.js + Express + TypeScript
+- IA: Google Gemini API
+- Banco: PostgreSQL
+- Validação: Zod
+- Testes: Vitest (frontend e backend)
 
-## 2. O Desafio (Escopo)
+## Funcionalidades implementadas
 
-Você deve criar uma aplicação Fullstack simples composta por:
+- Formulário do cidadão para abrir solicitações com:
+  - título
+  - descrição
+  - localização (texto + coordenadas)
+- Triagem por IA com saída estruturada:
+  - categoria
+  - prioridade (`Alta`, `Média`, `Baixa`)
+  - resumo técnico
+- Normalização de endereço por coordenadas (quando `GOOGLE_MAPS_API_KEY` está configurada no backend)
+- Painel administrativo em lista (`/admin-list`) com:
+  - filtros por endereço, categoria, prioridade e status
+  - paginação
+  - atualização de status por botões segmentados
+  - mapa de detalhe do chamado selecionado
+- Painel administrativo em mapa (`/admin-list/map`) com:
+  - mesmos filtros do painel de lista
+  - status padrão em `Pendente`
+  - carregamento em lotes de 1000 até buscar todas as páginas
+  - cluster automático por zoom (ativo em zoom <= 15, inativo em zoom > 15)
+  - renderização incremental por bounds para manter performance
+  - marcadores por categoria (ícones customizados)
+  - InfoWindow com informações principais do chamado
 
-- Frontend: Uma interface onde o cidadão relata o problema.
-- Backend: Uma API que recebe o relato, processa com IA e salva o resultado.
-- Integração IA: Um módulo que interpreta o texto livre e devolve dados estruturados.
+## Regras de domínio e contrato
 
-## 3. Requisitos Técnicos Obrigatórios
+- Categorias aceitas são fechadas (lista permitida no backend).
+- Prioridade é validada por enum (`Alta`, `Média`, `Baixa`) no backend.
+- Status aceitos: `Pendente`, `Resolvida`, `Cancelada`.
+- Endpoint de atualização de status é único:
+  - `PATCH /requests/:id/status`
 
-### Frontend (Cidadão)
+## IA e resiliência
 
-- Desenvolvido em React.js ou Next.js utilizando TypeScript.
-- Formulário simples contendo: Título, Descrição do problema e Localização (campo de texto ou coordenadas simuladas).
-- Feedback visual de carregamento (enquanto a IA processa) e confirmação de sucesso.
+- A chamada ao Gemini possui retry para falhas transitórias (até 3 tentativas com backoff).
+- Falhas da IA são propagadas com erro tipado (`AIProviderError`), permitindo resposta HTTP consistente:
+  - `503` para cenário equivalente a rate limit (ex.: 429)
+  - `502` para demais falhas de provider
 
-### Backend (API)
+## Arquitetura (resumo)
 
-- Desenvolvido em Node.js/NestJS.
-- Deve expor um endpoint (REST) para receber a solicitação.
-- Integração com LLM: Embora nossa stack oficial utilize AWS Bedrock, para esta PoC você tem liberdade para utilizar APIs gratuitas ou em tier de teste. O objetivo é avaliar como você orquestra a chamada e trata o retorno, não o modelo em si.
-- Banco de Dados: Salvar a solicitação processada em PostgreSQL ou MongoDB.
+Fluxo principal:
 
-### Integração com IA
+1. Frontend envia solicitação para `POST /requests`.
+2. Backend valida payload com Zod.
+3. Backend normaliza endereço (opcional, via geocoding reverso).
+4. Backend chama serviço de triagem IA (Gemini).
+5. Backend persiste no PostgreSQL.
+6. Frontend administrativo consulta `GET /requests` para renderizar lista e mapa.
 
-A IA deve retornar estritamente um JSON (independente do texto de entrada) contendo:
+Backend:
 
-- Categoria sugerida (ex: Iluminação, Via Pública, Saneamento);
-- Prioridade baseada na gravidade do texto (Baixa, Média, Alta);
-- Resumo técnico (uma reescrita formal e impessoal do problema para o gestor público).
+- `controllers`: camada HTTP
+- `schemas`: validação de entrada
+- `services`: regras de negócio (triagem, normalização)
+- `repositories`: acesso a dados
 
-### Sugestões Gratuitas/Free Tier
+Frontend:
 
-- Google Gemini API (via Google AI Studio): Possui um free tier generoso para testes.
-- Groq Cloud: Oferece acesso gratuito e extremamente rápido a modelos open-source (como Llama 3 e Mixtral), ideal para demonstrar performance.
+- `features/report`: formulário público
+- `features/admin-list`: painel em lista
+- `features/admin-list-map`: painel em mapa
+- `features/maps`: componentes/serviços compartilhados de mapa
 
-### Diferenciais
+## Estrutura de pastas
 
-- Validação de dados (ex: Zod).
-- Cobertura de testes (Unitários ou Integração).
-- Dockerização da aplicação.
+```txt
+backend/
+  src/
+    modules/
+      requests/
+      categories/
+      health/
+    db/
+frontend/
+  app/
+    admin-list/
+    admin-list/map/
+  src/features/
+    report/
+    admin-list/
+    admin-list-map/
+    maps/
+```
 
-## 4. O que será avaliado?
+## Variáveis de ambiente
 
-Este case foi desenhado para validar as competências descritas na nossa vaga:
+### Backend (`backend/.env`)
 
-- Arquitetura e Clean Code: Como você organiza pastas, separa responsabilidades e lida com a tipagem no TypeScript. Buscamos soluções escaláveis e sustentáveis.
-- Integração com IA: Avaliaremos a qualidade do seu prompt para a LLM. Como você garante que a IA não devolva alucinações ou formatos inválidos?
-- UX/UI: A interface é amigável e foca no cliente/cidadão?
+Use `backend/.env.example` como base:
 
-## 5. Entregáveis
+```env
+PORT=3333
+DATABASE_URL=postgresql://user:password@host:5432/database?sslmode=require
+GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.0-flash
+GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+```
 
-- Link para repositório público (GitHub/GitLab/Bitbucket).
-- O README.md do repositório deve incluir:
-  - Instruções de como rodar o projeto localmente.
-  - Explicação da arquitetura: Um parágrafo ou diagrama simples explicando suas escolhas.
-  - Se utilizou variáveis de ambiente (.env), envie um exemplo ou template.
+### Frontend (`frontend/.env.local`)
+
+Use `frontend/.env.example` como base:
+
+```env
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3333
+NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key
+```
+
+## Como rodar localmente
+
+Pré-requisitos:
+
+- Node.js 20+
+- npm 10+
+- PostgreSQL acessível pela `DATABASE_URL`
+
+### Backend
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+API padrão: `http://localhost:3333`
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+App padrão: `http://localhost:3000`
+
+## Testes e validação
+
+### Backend
+
+```bash
+cd backend
+npm run build
+npm test
+```
+
+### Frontend
+
+```bash
+cd frontend
+npm run lint
+npm test
+npm run build
+```
+
+Se existir pasta `coverage/` local e o lint acusar warning de arquivo gerado, rode:
+
+```bash
+npm run lint -- --ignore-pattern coverage/**
+```
+
+## Endpoints principais
+
+- `POST /requests`
+  - Cria solicitação com triagem IA
+- `GET /requests`
+  - Lista solicitações com filtros e paginação
+  - Query params:
+    - `search` (endereço)
+    - `category`
+    - `priority`
+    - `status`
+    - `page`
+    - `limit` (máximo 1000)
+- `GET /requests/:id`
+  - Detalhe de solicitação
+- `PATCH /requests/:id/status`
+  - Atualiza status da solicitação
+- `GET /health`
+  - Health check
+
+## Rotas de interface
+
+- `/` - formulário do cidadão
+- `/admin-list` - painel administrativo em lista
+- `/admin-list/map` - painel administrativo em mapa

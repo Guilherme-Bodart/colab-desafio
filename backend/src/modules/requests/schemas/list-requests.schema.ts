@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { ALLOWED_CATEGORY_NAMES } from "../../categories/category.constants";
+import { REQUEST_PRIORITIES } from "../requests.types";
 
 export const listRequestsSchema = z.object({
-  category: z.string().optional(),
-  priority: z.string().optional(),
+  category: z.enum(ALLOWED_CATEGORY_NAMES).optional(),
+  priority: z.enum(REQUEST_PRIORITIES).optional(),
   status: z.enum(["Pendente", "Resolvida", "Cancelada"]).optional(),
   search: z.string().optional(),
   dateFrom: z.string().datetime().optional(),

@@ -8,6 +8,5 @@ export const requestRouter = Router();
 
 requestRouter.get("/", listRequestsController);
 requestRouter.get("/:id", getRequestByIdController);
-requestRouter.patch("/:id", updateRequestStatusController);
 requestRouter.patch("/:id/status", updateRequestStatusController);
 requestRouter.post("/", createRequestController);

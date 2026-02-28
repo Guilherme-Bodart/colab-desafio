@@ -1,15 +1,13 @@
 ﻿"use client";
 
-import Link from "next/link";
-import { APIProvider, Map, Marker, useMap } from "@vis.gl/react-google-maps";
+import { APIProvider, Map, Marker } from "@vis.gl/react-google-maps";
 import { useEffect, useMemo, useState } from "react";
+import { AdminFiltersToolbar } from "@/src/features/admin/components/admin-filters-toolbar";
+import { MapAutoRecenter } from "@/src/features/maps/components/map-auto-recenter";
+import { DEFAULT_GOOGLE_MAP_ID } from "@/src/features/maps/constants/map-id";
 import { env } from "@/src/lib/env";
 import type { AdminRequest, RequestStatus } from "@/src/types/request";
-import {
-  categoryOptions,
-  priorityOptions,
-  statusOptions,
-} from "../constants/request-filters";
+import { statusOptions } from "../constants/request-filters";
 import { listRequests } from "../services/list-requests";
 import { updateRequestStatus } from "../services/update-request-status";
 import { buildCategoryPinIcon } from "../utils/category-map-pin";
@@ -22,23 +20,6 @@ type ToastItem = {
 };
 
 const pageSize = 12;
-
-function RecenterMap({
-  latitude,
-  longitude,
-}: {
-  latitude: number;
-  longitude: number;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-    map.panTo({ lat: latitude, lng: longitude });
-  }, [map, latitude, longitude]);
-
-  return null;
-}
 
 function formatRelativeDate(isoDate: string): string {
   const createdAt = new Date(isoDate).getTime();
@@ -191,119 +172,32 @@ export function AdminRequestList() {
         ))}
       </div>
 
-      <section className="admin-toolbar">
-        <div className="admin-toolbar-rows">
-          <div className="admin-toolbar-row">
-            <div className="admin-toolbar-heading">
-              <div>
-                <h2>Painel Administrativo</h2>
-                <p className="admin-toolbar-sub">
-                  Mostrando {items.length} de {total} chamados
-                </p>
-              </div>
-            </div>
-            <div className="admin-toolbar-right">
-              <input
-                className="admin-toolbar-search"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder={"Buscar por endere\u00e7o"}
-              />
-              <Link href="/admin-list/map" className="admin-nav-btn admin-nav-btn-map">
-                <svg
-                  className="admin-nav-icon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M3 6.2L8.8 4L15.2 6.2L21 4V17.8L15.2 20L8.8 17.8L3 20V6.2Z"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinejoin="round"
-                  />
-                  <path
-                    d="M8.8 4V17.8M15.2 6.2V20"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                  />
-                </svg>
-                Abrir mapa completo
-              </Link>
-            </div>
-          </div>
-
-          <div className="admin-toolbar-row">
-            <span className="admin-filter-label">Filtrar por:</span>
-            <div className="admin-toolbar-filter-group">
-              <select
-                value={categoryFilter}
-                onChange={(e) => {
-                  setCategoryFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">Categoria: Todas</option>
-                {categoryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={priorityFilter}
-                onChange={(e) => {
-                  setPriorityFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="">Prioridade: Todas</option>
-                {priorityOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value as RequestStatus | "");
-                  setPage(1);
-                }}
-              >
-                <option value="">Status: Todos</option>
-                {statusOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-
-              {hasActiveFilters ? (
-                <button type="button" className="admin-clear-link" onClick={clearFilters}>
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M18 6L6 18M6 6l12 12"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  Limpar filtros
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </section>
+      <AdminFiltersToolbar
+        title="Painel Administrativo"
+        subtitle={`Mostrando ${items.length} de ${total} chamados`}
+        searchInput={searchInput}
+        onSearchInputChange={setSearchInput}
+        categoryFilter={categoryFilter}
+        onCategoryFilterChange={(value) => {
+          setCategoryFilter(value);
+          setPage(1);
+        }}
+        priorityFilter={priorityFilter}
+        onPriorityFilterChange={(value) => {
+          setPriorityFilter(value);
+          setPage(1);
+        }}
+        statusFilter={statusFilter}
+        onStatusFilterChange={(value) => {
+          setStatusFilter(value);
+          setPage(1);
+        }}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={clearFilters}
+        navHref="/admin-list/map"
+        navLabel="Abrir mapa completo"
+        navIcon="map"
+      />
 
       <div className="admin-layout">
         <section className="admin-list-panel">
@@ -419,12 +313,15 @@ export function AdminRequestList() {
                     <Map
                       defaultCenter={{ lat: selected.latitude, lng: selected.longitude }}
                       defaultZoom={16}
+                      mapId={DEFAULT_GOOGLE_MAP_ID}
                       gestureHandling="greedy"
                       style={{ width: "100%", height: "100%" }}
                     >
-                      <RecenterMap
-                        latitude={selected.latitude}
-                        longitude={selected.longitude}
+                      <MapAutoRecenter
+                        center={{
+                          lat: selected.latitude,
+                          lng: selected.longitude,
+                        }}
                       />
                       <Marker
                         position={{

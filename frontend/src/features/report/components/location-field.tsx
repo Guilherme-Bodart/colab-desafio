@@ -5,11 +5,12 @@ import {
   Map,
   Marker,
   type MapMouseEvent,
-  useMap,
   useMapsLibrary,
 } from "@vis.gl/react-google-maps";
-
-const DEFAULT_CENTER = { lat: -23.55052, lng: -46.633308 };
+import { MapAutoRecenter } from "@/src/features/maps/components/map-auto-recenter";
+import { DEFAULT_MAP_CENTER } from "@/src/features/maps/constants/default-map-center";
+import { DEFAULT_GOOGLE_MAP_ID } from "@/src/features/maps/constants/map-id";
+import { useUserGeolocationCenter } from "@/src/features/maps/hooks/use-user-geolocation-center";
 
 type LocationFieldProps = {
   value: string;
@@ -36,11 +37,9 @@ export function LocationField({
   const [position, setPosition] = useState<google.maps.LatLngLiteral | null>(
     null
   );
-  const [userCenter, setUserCenter] = useState<google.maps.LatLngLiteral | null>(
-    null
-  );
+  const userCenter = useUserGeolocationCenter();
   const mapCenter = useMemo(
-    () => position ?? userCenter ?? DEFAULT_CENTER,
+    () => position ?? userCenter ?? DEFAULT_MAP_CENTER,
     [position, userCenter]
   );
 
@@ -65,22 +64,6 @@ export function LocationField({
       setSuggestions([]);
     });
   }
-
-  useEffect(() => {
-    if (!navigator.geolocation) return;
-
-    navigator.geolocation.getCurrentPosition(
-      (coords) => {
-        setUserCenter({
-          lat: coords.coords.latitude,
-          lng: coords.coords.longitude,
-        });
-      },
-      () => {
-        // Se o usuário negar permissão, mantemos o centro padrão.
-      }
-    );
-  }, []);
 
   useEffect(() => {
     if (!placesLibrary) return;
@@ -239,12 +222,13 @@ export function LocationField({
         <Map
           defaultCenter={mapCenter}
           defaultZoom={15}
+          mapId={DEFAULT_GOOGLE_MAP_ID}
           onClick={handleMapClick}
           gestureHandling="greedy"
           disableDefaultUI={false}
           style={{ width: "100%", height: "100%" }}
         >
-          <MapAutoRecenter position={position} />
+          <MapAutoRecenter center={position ?? userCenter} />
           {position ? (
             <Marker
               position={position}
@@ -259,20 +243,4 @@ export function LocationField({
       </p>
     </div>
   );
-}
-function MapAutoRecenter({
-  position,
-}: {
-  position: google.maps.LatLngLiteral | null;
-}) {
-  const map = useMap();
-  const lat = position?.lat;
-  const lng = position?.lng;
-
-  useEffect(() => {
-    if (!map || lat === undefined || lng === undefined) return;
-    map.panTo({ lat, lng });
-  }, [map, lat, lng]);
-
-  return null;
 }

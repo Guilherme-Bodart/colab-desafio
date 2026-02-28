@@ -1,15 +1,19 @@
 "use client";
 
-import Link from "next/link";
-import { MarkerClusterer, type Renderer } from "@googlemaps/markerclusterer";
+import { MarkerClusterer } from "@googlemaps/markerclusterer";
 import { APIProvider, Map, useMap } from "@vis.gl/react-google-maps";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  categoryOptions,
-  priorityOptions,
-  statusOptions,
-} from "@/src/features/admin-list/constants/request-filters";
+import { AdminFiltersToolbar } from "@/src/features/admin/components/admin-filters-toolbar";
 import { buildCategoryPinIcon } from "@/src/features/admin-list/utils/category-map-pin";
+import { MapZoomModeSync } from "@/src/features/maps/components/map-zoom-mode-sync";
+import { DEFAULT_MAP_CENTER } from "@/src/features/maps/constants/default-map-center";
+import { DEFAULT_GOOGLE_MAP_ID } from "@/src/features/maps/constants/map-id";
+import { adminClusterRenderer } from "@/src/features/maps/services/cluster-renderer.service";
+import {
+  diffVisibleMarkers,
+  findVisibleMarkerIds,
+} from "@/src/features/maps/services/marker-visibility.service";
+import { openAdminRequestInfoWindow } from "@/src/features/maps/services/admin-request-infowindow.service";
 import { env } from "@/src/lib/env";
 import type { AdminRequest, RequestStatus } from "@/src/types/request";
 import { listAllRequests } from "../services/list-all-requests";
@@ -22,107 +26,7 @@ type ToastItem = {
   description: string;
 };
 
-const defaultCenter = { lat: -23.55052, lng: -46.633308 };
 const clusterZoomThreshold = 15;
-const clusterIconCache = new globalThis.Map<string, string>();
-
-type ClusterStyle = {
-  size: number;
-  bgColor: string;
-  borderColor: string;
-  textColor: string;
-};
-
-function resolveClusterStyle(count: number): ClusterStyle {
-  if (count >= 50) {
-    return {
-      size: 54,
-      bgColor: "#0c6fdb",
-      borderColor: "#095db9",
-      textColor: "#ffffff",
-    };
-  }
-
-  if (count >= 10) {
-    return {
-      size: 48,
-      bgColor: "#93c5fd",
-      borderColor: "#0c6fdb",
-      textColor: "#123f84",
-    };
-  }
-
-  return {
-    size: 42,
-    bgColor: "#dbeafe",
-    borderColor: "#60a5fa",
-    textColor: "#1e3a8a",
-  };
-}
-
-function getClusterIconUrl(count: number, style: ClusterStyle): string {
-  const fontSize = count >= 100 ? 13 : 14;
-  const cacheKey = `${count}-${style.size}-${style.bgColor}-${style.borderColor}-${style.textColor}`;
-  const cached = clusterIconCache.get(cacheKey);
-  if (cached) return cached;
-
-  const center = style.size / 2;
-  const radius = center - 2;
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${style.size}" height="${style.size}" viewBox="0 0 ${style.size} ${style.size}">
-      <circle cx="${center}" cy="${center}" r="${radius}" fill="${style.bgColor}" stroke="${style.borderColor}" stroke-width="3" />
-      <text x="50%" y="50%" text-anchor="middle" dominant-baseline="central" fill="${style.textColor}" font-family="Roboto, Arial, sans-serif" font-size="${fontSize}" font-weight="700">${count}</text>
-    </svg>
-  `;
-
-  const url = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-  clusterIconCache.set(cacheKey, url);
-  return url;
-}
-
-const clusterRenderer: Renderer = {
-  render: ({ count, position }) => {
-    const style = resolveClusterStyle(count);
-    const maxZIndex = (google.maps.Marker.MAX_ZINDEX ?? 100000) as number;
-
-    return new google.maps.Marker({
-      position,
-      icon: {
-        url: getClusterIconUrl(count, style),
-        scaledSize: new google.maps.Size(style.size, style.size),
-      },
-      zIndex: maxZIndex + count,
-    });
-  },
-};
-
-function MapZoomModeSync({
-  threshold,
-  onModeChange,
-}: {
-  threshold: number;
-  onModeChange: (nextClusterMode: boolean) => void;
-}) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!map) return;
-
-    const syncClusterMode = () => {
-      const zoom = map.getZoom() ?? 0;
-      onModeChange(isClusterModeEnabledForZoom(zoom, threshold));
-    };
-
-    syncClusterMode();
-    const listener = map.addListener("zoom_changed", syncClusterMode);
-
-    return () => {
-      listener.remove();
-    };
-  }, [map, onModeChange, threshold]);
-
-  return null;
-}
 
 function RequestMarkerLayer({
   requests,
@@ -136,6 +40,7 @@ function RequestMarkerLayer({
     new globalThis.Map()
   );
   const clustererRef = useRef<MarkerClusterer | null>(null);
+  const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const visibleMarkerIdsRef = useRef<Set<string>>(new Set());
   const rafRef = useRef<number | null>(null);
   const clusterModeEnabledRef = useRef(clusterModeEnabled);
@@ -157,40 +62,21 @@ function RequestMarkerLayer({
     const bounds = map.getBounds();
     if (!bounds) return;
 
-    const nextVisibleIds = new Set<string>();
-    const addedMarkers: google.maps.Marker[] = [];
-    const removedMarkers: google.maps.Marker[] = [];
     const markers = markersRef.current;
     const previousVisibleIds = visibleMarkerIdsRef.current;
-
-    markers.forEach((marker, id) => {
-      const position = marker.getPosition();
-      if (!position) return;
-      if (bounds.contains(position)) {
-        nextVisibleIds.add(id);
-      }
-    });
-
-    previousVisibleIds.forEach((id) => {
-      if (!nextVisibleIds.has(id)) {
-        const marker = markers.get(id);
-        if (marker) removedMarkers.push(marker);
-      }
-    });
-
-    nextVisibleIds.forEach((id) => {
-      if (!previousVisibleIds.has(id)) {
-        const marker = markers.get(id);
-        if (marker) addedMarkers.push(marker);
-      }
-    });
+    const nextVisibleIds = findVisibleMarkerIds(markers, bounds);
+    const { addedMarkers, removedMarkers } = diffVisibleMarkers(
+      markers,
+      previousVisibleIds,
+      nextVisibleIds
+    );
 
     if (clusterModeEnabledRef.current) {
       if (!clustererRef.current) {
         clustererRef.current = new MarkerClusterer({
           map,
           markers: [],
-          renderer: clusterRenderer,
+          renderer: adminClusterRenderer,
         });
       }
 
@@ -215,7 +101,11 @@ function RequestMarkerLayer({
     if (!map || typeof window === "undefined" || !window.google?.maps) return;
 
     clearClusterer();
-    markersRef.current.forEach((marker) => marker.setMap(null));
+    infoWindowRef.current?.close();
+    markersRef.current.forEach((marker) => {
+      google.maps.event.clearInstanceListeners(marker);
+      marker.setMap(null);
+    });
     markersRef.current.clear();
     visibleMarkerIdsRef.current = new Set();
 
@@ -224,21 +114,35 @@ function RequestMarkerLayer({
         (item) => Number.isFinite(item.latitude) && Number.isFinite(item.longitude)
       )
       .map(
-        (item) =>
-          [
-            item.id,
-            new google.maps.Marker({
-              position: {
-                lat: item.latitude,
-                lng: item.longitude,
-              },
-              title: item.title,
-              icon: {
-                url: buildCategoryPinIcon(item.category),
-                scaledSize: new google.maps.Size(48, 48),
-              },
-            }),
-          ] as const
+        (item) => {
+          const marker = new google.maps.Marker({
+            position: {
+              lat: item.latitude,
+              lng: item.longitude,
+            },
+            title: item.title,
+            icon: {
+              url: buildCategoryPinIcon(item.category),
+              scaledSize: new google.maps.Size(48, 48),
+            },
+          });
+
+          marker.addListener("click", () => {
+            if (!map) return;
+            if (!infoWindowRef.current) {
+              infoWindowRef.current = new google.maps.InfoWindow();
+            }
+
+            openAdminRequestInfoWindow({
+              infoWindow: infoWindowRef.current,
+              marker,
+              map,
+              request: item,
+            });
+          });
+
+          return [item.id, marker] as const;
+        }
       );
 
     markersRef.current = new globalThis.Map(markerEntries);
@@ -258,11 +162,46 @@ function RequestMarkerLayer({
 
     return () => {
       clearClusterer();
-      markers.forEach((marker) => marker.setMap(null));
+      markers.forEach((marker) => {
+        google.maps.event.clearInstanceListeners(marker);
+        marker.setMap(null);
+      });
+      infoWindowRef.current?.close();
       markersRef.current.clear();
       visibleMarkerIdsRef.current = new Set();
     };
   }, [clearClusterer, map, requests, syncVisibleMarkers]);
+
+  useEffect(() => {
+    if (!map) return;
+
+    const mapClickListener = map.addListener("click", () => {
+      infoWindowRef.current?.close();
+    });
+
+    const onDocumentPointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element)) {
+        infoWindowRef.current?.close();
+        return;
+      }
+
+      const clickedInsideInfoWindow = Boolean(
+        target.closest(".gm-style-iw") || target.closest(".gm-style-iw-c")
+      );
+
+      if (!clickedInsideInfoWindow) {
+        infoWindowRef.current?.close();
+      }
+    };
+
+    document.addEventListener("pointerdown", onDocumentPointerDown, true);
+
+    return () => {
+      mapClickListener.remove();
+      document.removeEventListener("pointerdown", onDocumentPointerDown, true);
+    };
+  }, [map]);
 
   useEffect(() => {
     if (!map) return;
@@ -413,103 +352,23 @@ export function AdminRequestMap() {
         ))}
       </div>
 
-      <section className="admin-toolbar">
-        <div className="admin-toolbar-rows">
-          <div className="admin-toolbar-row">
-            <div className="admin-toolbar-heading">
-              <div>
-                <h2>Painel Administrativo - Mapa</h2>
-                <p className="admin-toolbar-sub">{subtitle}</p>
-              </div>
-            </div>
-            <div className="admin-toolbar-right">
-              <input
-                className="admin-toolbar-search"
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                placeholder={"Buscar por endere\u00e7o"}
-              />
-              <Link href="/admin-list" className="admin-nav-btn">
-                <svg
-                  className="admin-nav-icon"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  xmlns="http://www.w3.org/2000/svg"
-                  aria-hidden="true"
-                >
-                  <path
-                    d="M4 6.5h16M4 12h16M4 17.5h16"
-                    stroke="currentColor"
-                    strokeWidth="1.8"
-                    strokeLinecap="round"
-                  />
-                </svg>
-                Ver lista
-              </Link>
-            </div>
-          </div>
-
-          <div className="admin-toolbar-row">
-            <span className="admin-filter-label">Filtrar por:</span>
-            <div className="admin-toolbar-filter-group">
-              <select
-                value={categoryFilter}
-                onChange={(e) => setCategoryFilter(e.target.value)}
-              >
-                <option value="">Categoria: Todas</option>
-                {categoryOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={priorityFilter}
-                onChange={(e) => setPriorityFilter(e.target.value)}
-              >
-                <option value="">Prioridade: Todas</option>
-                {priorityOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value as RequestStatus | "")}
-              >
-                <option value="">Status: Todos</option>
-                {statusOptions.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-
-              {hasActiveFilters ? (
-                <button type="button" className="admin-clear-link" onClick={clearFilters}>
-                  <svg
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    xmlns="http://www.w3.org/2000/svg"
-                    aria-hidden="true"
-                  >
-                    <path
-                      d="M18 6L6 18M6 6l12 12"
-                      stroke="currentColor"
-                      strokeWidth="1.8"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                  Limpar filtros
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      </section>
+      <AdminFiltersToolbar
+        title="Painel Administrativo - Mapa"
+        subtitle={subtitle}
+        searchInput={searchInput}
+        onSearchInputChange={setSearchInput}
+        categoryFilter={categoryFilter}
+        onCategoryFilterChange={setCategoryFilter}
+        priorityFilter={priorityFilter}
+        onPriorityFilterChange={setPriorityFilter}
+        statusFilter={statusFilter}
+        onStatusFilterChange={setStatusFilter}
+        hasActiveFilters={hasActiveFilters}
+        onClearFilters={clearFilters}
+        navHref="/admin-list"
+        navLabel="Ver lista"
+        navIcon="list"
+      />
 
       <section className="admin-map-panel">
         {!env.googleMapsApiKey ? (
@@ -521,14 +380,17 @@ export function AdminRequestMap() {
             <div className="admin-map-canvas">
               <APIProvider apiKey={env.googleMapsApiKey}>
                 <Map
-                  defaultCenter={defaultCenter}
+                  defaultCenter={DEFAULT_MAP_CENTER}
                   defaultZoom={11}
+                  mapId={DEFAULT_GOOGLE_MAP_ID}
                   gestureHandling="greedy"
                   style={{ width: "100%", height: "100%" }}
                 >
                   <MapZoomModeSync
-                    threshold={clusterZoomThreshold}
                     onModeChange={setClusterModeEnabled}
+                    resolveModeForZoom={(zoom) =>
+                      isClusterModeEnabledForZoom(zoom, clusterZoomThreshold)
+                    }
                   />
                   <RequestMarkerLayer
                     requests={items}

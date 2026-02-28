@@ -117,9 +117,11 @@ a {
   width: 100%;
   text-align: left;
   border: 0;
-  background: transparent;
+  background: #fff;
+  color: #1c2330;
   padding: 10px 12px;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
 }
 
@@ -146,7 +148,7 @@ a {
   color: #2f3f53;
 }
 
-.form button {
+.form > button[type="submit"] {
   border: none;
   border-radius: 8px;
   background: var(--primary);
@@ -157,11 +159,11 @@ a {
   cursor: pointer;
 }
 
-.form button:hover {
+.form > button[type="submit"]:hover {
   background: var(--primary-hover);
 }
 
-.form button:disabled {
+.form > button[type="submit"]:disabled {
   opacity: 0.7;
   cursor: not-allowed;
 }

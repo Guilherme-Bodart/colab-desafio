@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { db } from "../../../db/client";
-import { findOrCreateCategory } from "../../categories/repositories/category.repository";
+import { findAllowedCategory } from "../../categories/repositories/category.repository";
 import type {
   CreateRequestRecordInput,
   ListRequestsFilters,
@@ -30,7 +30,7 @@ export async function createRequestRecord(
   input: CreateRequestRecordInput
 ): Promise<ProcessedRequest> {
   const id = randomUUID();
-  const category = await findOrCreateCategory(input.category);
+  const category = await findAllowedCategory(input.category);
 
   const result = await db.query(
     `
@@ -93,37 +93,33 @@ export async function listRequests(
 ): Promise<PaginatedRequestsResponse> {
   const values: unknown[] = [];
   const conditions: string[] = [];
+  const addCondition = (
+    value: unknown,
+    clauseBuilder: (param: string) => string
+  ) => {
+    if (value === undefined || value === null || value === "") {
+      return;
+    }
 
-  if (filters.category) {
-    values.push(filters.category);
-    conditions.push(`c.normalized_name = LOWER(TRIM($${values.length}))`);
-  }
-
-  if (filters.priority) {
-    values.push(filters.priority);
-    conditions.push(`priority = $${values.length}`);
-  }
-
-  if (filters.status) {
-    values.push(filters.status);
-    conditions.push(`status = $${values.length}`);
-  }
-
-  if (filters.search) {
-    values.push(`%${filters.search}%`);
+    values.push(value);
     const param = `$${values.length}`;
-    conditions.push(`location_text ILIKE ${param}`);
-  }
+    conditions.push(clauseBuilder(param));
+  };
 
-  if (filters.dateFrom) {
-    values.push(filters.dateFrom);
-    conditions.push(`requests.created_at >= $${values.length}::timestamptz`);
-  }
-
-  if (filters.dateTo) {
-    values.push(filters.dateTo);
-    conditions.push(`requests.created_at <= $${values.length}::timestamptz`);
-  }
+  addCondition(filters.category, (param) => {
+    return `c.normalized_name = LOWER(TRIM(${param}))`;
+  });
+  addCondition(filters.priority, (param) => `priority = ${param}`);
+  addCondition(filters.status, (param) => `status = ${param}`);
+  addCondition(filters.search ? `%${filters.search}%` : undefined, (param) => {
+    return `location_text ILIKE ${param}`;
+  });
+  addCondition(filters.dateFrom, (param) => {
+    return `requests.created_at >= ${param}::timestamptz`;
+  });
+  addCondition(filters.dateTo, (param) => {
+    return `requests.created_at <= ${param}::timestamptz`;
+  });
 
   const whereClause =
     conditions.length > 0 ? `WHERE ${conditions.join(" AND ")}` : "";

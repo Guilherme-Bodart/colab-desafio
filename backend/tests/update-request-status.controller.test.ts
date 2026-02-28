@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { updateRequestStatusController } from "../src/modules/requests/controllers/update-request-status.controller";
 import {
   findRequestById,
@@ -13,6 +13,7 @@ vi.mock("../src/modules/requests/repositories/request.repository", () => ({
 
 const mockedFindRequestById = vi.mocked(findRequestById);
 const mockedUpdateRequestStatus = vi.mocked(updateRequestStatus);
+let consoleErrorSpy: ReturnType<typeof vi.spyOn>;
 
 function buildResponse() {
   const json = vi.fn();
@@ -23,6 +24,11 @@ function buildResponse() {
 describe("updateRequestStatusController", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    consoleErrorSpy.mockRestore();
   });
 
   it("retorna 400 para id invalido", async () => {
@@ -130,6 +136,7 @@ describe("updateRequestStatusController", () => {
 
     await updateRequestStatusController(req, res);
 
+    expect(consoleErrorSpy).toHaveBeenCalled();
     expect(status).toHaveBeenCalledWith(500);
     expect(json).toHaveBeenCalled();
   });

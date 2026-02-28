@@ -1,16 +1,17 @@
 import { db } from "../../../db/client";
+import {
+  normalizeCategoryName,
+  resolveAllowedCategoryName,
+} from "../category.constants";
 
-function normalizeCategoryName(name: string): string {
-  return name.trim().toLowerCase();
-}
-
-export async function findOrCreateCategory(name: string): Promise<{
+export async function findAllowedCategory(name: string): Promise<{
   id: number;
   name: string;
 }> {
-  const normalized = normalizeCategoryName(name);
+  const resolvedName = resolveAllowedCategoryName(name);
+  const normalized = normalizeCategoryName(resolvedName);
 
-  const existing = await db.query(
+  const existing = await db.query<{ id: number; name: string }>(
     `
       SELECT id, name
       FROM categories
@@ -27,19 +28,9 @@ export async function findOrCreateCategory(name: string): Promise<{
     };
   }
 
-  const inserted = await db.query(
-    `
-      INSERT INTO categories (name, normalized_name)
-      VALUES ($1, $2)
-      ON CONFLICT (normalized_name)
-      DO UPDATE SET name = categories.name
-      RETURNING id, name
-    `,
-    [name.trim(), normalized]
+  throw new Error(
+    `Categoria permitida não encontrada na base: "${resolvedName}". Verifique initDatabase().`
   );
-
-  return {
-    id: inserted.rows[0].id,
-    name: inserted.rows[0].name,
-  };
 }
+
+export const findOrCreateCategory = findAllowedCategory;

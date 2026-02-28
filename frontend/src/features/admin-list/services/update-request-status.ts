@@ -5,19 +5,11 @@ export async function updateRequestStatus(
   id: string,
   status: RequestStatus
 ): Promise<AdminRequest> {
-  let response = await fetch(`${env.apiBaseUrl}/requests/${id}/status`, {
+  const response = await fetch(`${env.apiBaseUrl}/requests/${id}/status`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ status }),
   });
-
-  if (response.status === 404) {
-    response = await fetch(`${env.apiBaseUrl}/requests/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-  }
 
   if (!response.ok) {
     const payload = (await response.json().catch(() => null)) as

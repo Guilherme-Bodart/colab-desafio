@@ -1,4 +1,8 @@
 import { db } from "./client";
+import {
+  ALLOWED_CATEGORY_NAMES,
+  normalizeCategoryName,
+} from "../modules/categories/category.constants";
 
 export async function initDatabase() {
   await db.query(`
@@ -47,6 +51,17 @@ export async function initDatabase() {
     ALTER COLUMN category DROP NOT NULL;
   `);
 
+  for (const category of ALLOWED_CATEGORY_NAMES) {
+    await db.query(
+      `
+        INSERT INTO categories (name, normalized_name)
+        VALUES ($1, $2)
+        ON CONFLICT (normalized_name) DO NOTHING;
+      `,
+      [category, normalizeCategoryName(category)]
+    );
+  }
+
   const categoryColumn = await db.query<{ exists: boolean }>(
     `
       SELECT EXISTS (
@@ -59,11 +74,11 @@ export async function initDatabase() {
 
   if (categoryColumn.rows[0]?.exists) {
     await db.query(`
-      INSERT INTO categories (name, normalized_name)
-      SELECT DISTINCT category, LOWER(TRIM(category))
-      FROM requests
-      WHERE category IS NOT NULL AND TRIM(category) <> ''
-      ON CONFLICT (normalized_name) DO NOTHING;
+      UPDATE requests r
+      SET category_id = c.id
+      FROM categories c
+      WHERE r.category_id IS NULL
+        AND LOWER(TRIM(r.category)) = c.normalized_name;
     `);
 
     await db.query(`
@@ -71,7 +86,7 @@ export async function initDatabase() {
       SET category_id = c.id
       FROM categories c
       WHERE r.category_id IS NULL
-        AND LOWER(TRIM(r.category)) = c.normalized_name;
+        AND c.normalized_name = 'outros';
     `);
   }
 }

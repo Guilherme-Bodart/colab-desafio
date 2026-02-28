@@ -9,6 +9,7 @@ vi.mock("../src/db/client", () => ({
 }));
 
 const mockedDbQuery = vi.mocked(db.query);
+type DbQueryResult = Awaited<ReturnType<typeof db.query>>;
 
 describe("request.repository listRequests", () => {
   beforeEach(() => {
@@ -17,8 +18,10 @@ describe("request.repository listRequests", () => {
 
   it("aplica busca somente por location_text", async () => {
     mockedDbQuery
-      .mockResolvedValueOnce({ rows: [{ total: 1 }] } as any)
-      .mockResolvedValueOnce({ rows: [] } as any);
+      .mockResolvedValueOnce(
+        { rows: [{ total: 1 }] } as unknown as DbQueryResult
+      )
+      .mockResolvedValueOnce({ rows: [] } as unknown as DbQueryResult);
 
     await listRequests({
       page: 1,

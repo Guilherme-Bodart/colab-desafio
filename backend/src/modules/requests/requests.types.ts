@@ -1,3 +1,5 @@
+﻿import type { AllowedCategoryName } from "../categories/category.constants";
+
 export type CreateRequestInput = {
   title: string;
   description: string;
@@ -7,23 +9,18 @@ export type CreateRequestInput = {
 };
 
 export type RequestStatus = "Pendente" | "Resolvida" | "Cancelada";
+export const REQUEST_PRIORITIES = ["Alta", "Média", "Baixa"] as const;
+export type RequestPriority = (typeof REQUEST_PRIORITIES)[number];
 
 export type TriageResult = {
-  category:
-    | "Limpeza Urbana e Manejo de Resíduos"
-    | "Manutenção de Áreas Verdes e Paisagismo"
-    | "Infraestrutura e Conservação do Mobiliário Urbano"
-    | "Drenagem e Saneamento"
-    | "Poluição Visual e Ambiental"
-    | "Controle de Zoonoses e Pragas"
-    | "Outros";
-  priority: "Alta" | "Média" | "Baixa";
+  category: AllowedCategoryName;
+  priority: RequestPriority;
   technicalSummary: string;
 };
 
 export type TriagePersistedFields = {
   category: string;
-  priority: string;
+  priority: RequestPriority;
   technicalSummary: string;
 };
 
@@ -37,8 +34,8 @@ export type ProcessedRequest = CreateRequestRecordInput & {
 };
 
 export type ListRequestsFilters = {
-  category?: string;
-  priority?: string;
+  category?: AllowedCategoryName;
+  priority?: RequestPriority;
   status?: RequestStatus;
   search?: string;
   dateFrom?: string;
