@@ -108,7 +108,7 @@ Use `backend/.env.example` como base:
 PORT=3333
 DATABASE_URL=postgresql://user:password@host:5432/database?sslmode=require
 GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.0-flash
+GEMINI_MODEL=gemini-2.0-flash ou gemma-3-27b-it(mais testes grátis por dia)
 GOOGLE_MAPS_API_KEY=your_google_maps_api_key
 ```
 
